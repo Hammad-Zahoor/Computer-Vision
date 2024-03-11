@@ -1,0 +1,162 @@
+from PIL import Image, ImageOps, ImageTk        #Libraries
+import numpy as np
+import tkinter as tk
+from tkinter import filedialog, Canvas, messagebox, simpledialog
+
+def create_digital_negative(image_array):
+    inverted_array = 255 - image_array      # for digital negative
+    negative_image = Image.fromarray(inverted_array)     
+    display_image(negative_image)     # for displaying image
+
+def histogram_stretch(image_array):
+    input_str = simpledialog.askstring("Input", "Enter stretch_min and stretch_max values separated by a comma (e.g., 0,255):")
+    stretch_min, stretch_max = map(float, input_str.split(','))
+
+    # Apply histogram stretching operation according to book
+    stretched_array = (image_array - np.min(image_array)) / (np.max(image_array) - np.min(image_array)) * (stretch_max - stretch_min) + stretch_min
+    stretched_image = Image.fromarray(stretched_array.astype(np.uint8))  # Convert the NumPy back to an image
+    display_image(stretched_image)
+
+def histogram_shrink(image_array):
+    input_str = simpledialog.askstring("Input", "Enter shrink_min and shrink_max values separated by a comma (e.g., 0,255):")
+    shrink_min, shrink_max = map(float, input_str.split(','))
+
+    # Apply histogram shrinking operation according to book
+    shrinked_array = (shrink_max - shrink_min) / (np.max(image_array) - np.min(image_array)) * (image_array - np.min(image_array)) + shrink_min
+
+    shrinked_array = np.clip(shrinked_array, 0, 255)   #clipping
+    shrinked_image = Image.fromarray(shrinked_array.astype(np.uint8))     # Convert the NumPy array back to an image
+    display_image(shrinked_image)
+
+def linear_mapping(image_array, point1, point2):
+    x1, y1 = point1
+    x2, y2 = point2
+
+    # Calculate slope (m) and intercept (b)
+    slope = (y2 - y1) / (x2 - x1)
+    intercept = y1 - slope * x1
+
+    mapped_array = slope * image_array + intercept   # Apply linear mapping operation: y = mx + b
+    mapped_array = np.clip(mapped_array, 0, 255)   #clipping
+
+    mapped_image = Image.fromarray(mapped_array.astype(np.uint8))  
+    # Convert the NumPy array back to an image
+    display_image(mapped_image)
+
+def non_linear_mapping(image_array, point1, point2):
+    x1, y1 = point1
+    x2, y2 = point2
+
+    # For now, let's use a quadratic non-linear equation
+    # We can also adjust some other non-linear functions
+    a = (y2 - y1) / (x2 - x1)**2
+    b = -2 * a * x1
+    c = y1 + a * x1**2
+    mapped_array = a * image_array**2 + b * image_array + c
+
+    mapped_array = np.clip(mapped_array, 0, 255)    # clipping
+    mapped_image = Image.fromarray(mapped_array.astype(np.uint8))     # Convert the NumPy array back to an image
+
+    # Display the mapped image
+    display_image(mapped_image)
+
+def choose_input_file():
+    file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp")])
+    input_entry.delete(0, tk.END)
+    input_entry.insert(0, file_path)
+    load_and_display_image(file_path)
+
+def load_and_display_image(file_path):
+    try:
+        global original_image  # Declare global variable
+        original_image = Image.open(file_path)
+        # Resize the image to fit in the canvas
+        resized_image = original_image.resize((900, 500))
+        image_array = np.array(resized_image)
+        display_image(resized_image)
+    except Exception as e:
+        tk.messagebox.showerror("Error", f"Failed to load image: {e}")
+
+def display_image(image):
+    # Resize the image to fit the canvas
+    resized_image = image.resize((900, 500))
+    photo = ImageTk.PhotoImage(resized_image)
+    canvas.itemconfig(image_item, image=photo)
+    canvas.image = photo
+
+
+def show_digital_negative():
+    if 'original_image' in globals():
+        create_digital_negative(np.array(original_image))
+    else:
+        messagebox.showerror("Error", "Please select an input image.")
+
+def show_histogram_stretch():
+    if 'original_image' in globals():
+        histogram_stretch(np.array(original_image))
+    else:
+        messagebox.showerror("Error", "Please select an input image.")
+
+def show_histogram_shrink():
+    if 'original_image' in globals():
+        histogram_shrink(np.array(original_image))
+    else:
+        messagebox.showerror("Error", "Please select an input image.")
+
+def show_linear_mapping():
+    if 'original_image' in globals():
+        points_str = simpledialog.askstring("Input", "Enter both points' coordinates as x1,y1,x2,y2 (e.g., 10,20,50,200):")
+
+        # Convert string coordinates to integers
+        points = [int(coord) for coord in points_str.split(',')]
+
+        # Extract coordinates of the two points
+        point1 = points[:2]
+        point2 = points[2:]
+        
+        linear_mapping(np.array(original_image), point1, point2)
+    else:
+        messagebox.showerror("Error", "Please select an input image.")
+
+def show_non_linear_mapping():
+    if 'original_image' in globals():
+        points_str = simpledialog.askstring("Input", "Enter both points' coordinates as x1,y1,x2,y2 (e.g., 10,20,50,200):")
+
+        # Convert string coordinates to integers
+        points = [int(coord) for coord in points_str.split(',')]
+
+        # Extract coordinates of the two points
+        point1 = points[:2]
+        point2 = points[2:]
+
+        non_linear_mapping(np.array(original_image), point1, point2)
+    else:
+        messagebox.showerror("Error", "Please select an input image.")
+
+# Create the main window
+window = tk.Tk()
+window.geometry("1000x650")
+window.title("Assignment # 1 - Image Processing")
+
+# Create and place widgets
+button_config = {'bg': 'red', 'fg': 'white', 'pady': 5, 'padx': 15}
+
+tk.Label(window, text="Input the Image here :").grid(row=0, column=0, sticky="e", padx=15, pady=5)
+input_entry = tk.Entry(window, width=40)
+input_entry.grid(row=0, column=1, padx=15, pady=5)
+tk.Button(window, text="Browse", command=choose_input_file, **button_config).grid(row=0, column=2, padx=15, pady=5, sticky="w")
+
+canvas = Canvas(window, width=900, height=500)
+canvas.grid(row=1, column=0, columnspan=3, pady=10, padx=30)
+image_item = canvas.create_image(0, 0, anchor=tk.NW)
+
+button_config = {'bg': 'red', 'fg': 'white', 'pady': 0, 'padx': 2}
+
+tk.Button(window, text="Digital Negative", command=show_digital_negative, **button_config).grid(row=2, column=0)
+tk.Button(window, text="Histogram Stretch", command=show_histogram_stretch, **button_config).grid(row=2, column=1)
+tk.Button(window, text="Histogram Shrink", command=show_histogram_shrink, **button_config).grid(row=2, column=2)
+tk.Button(window, text="Linear Mapping", command=show_linear_mapping, **button_config).grid(row=3, column=1, pady=3)
+tk.Button(window, text="Non-Linear Mapping", command=show_non_linear_mapping, **button_config).grid(row=3, column=2, pady=3)
+
+# Start the GUI event loop
+window.mainloop()
