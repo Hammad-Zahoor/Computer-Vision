@@ -1,0 +1,138 @@
+from PIL import Image, ImageOps, ImageTk
+import numpy as np
+import tkinter as tk
+from tkinter import filedialog, Canvas, messagebox, simpledialog
+import cv2
+
+def histogram_equalization(img):
+
+    histogram = cv2.calcHist([img], [0], None, [256], [0, 256])
+    
+    cumulative_sum = np.cumsum(histogram)   #cumulative sum
+    
+    total_pixels = img.shape[0] * img.shape[1]   # for size of image
+    normalized_cumulative_sum = cumulative_sum / total_pixels  #sum / total
+    equalized_vals = np.round(normalized_cumulative_sum * 255)  # highest range
+    
+    equalized_img = equalized_vals[img]
+    equalized_img = np.uint8(equalized_img)
+    
+    return equalized_vals   
+
+    
+    
+def set_histogram_specification(original_image,specified_image):
+    
+    if original_image and specified_image:
+        original_image = np.array(original_image.convert("L"))
+        specified_image = np.array(specified_image.convert("L"))
+
+        if original_image is None or specified_image is None:
+            print("Error: Failed to load one or both images.")
+            return
+        
+        equalized_original = histogram_equalization(original_image)
+        equalized_specified = histogram_equalization(specified_image)
+        # As mentiond in book
+        O = np.arange(256)
+        H = equalized_original
+        HS = equalized_specified
+        OS = np.arange(256)
+        M = np.zeros(256)
+
+        ind = 0
+      
+        for i in range(len(H)):
+            nearest_index = np.abs(HS - H[i]).argmin()
+            corresponding_os_value = OS[nearest_index]
+            M[ind] = corresponding_os_value
+            ind += 1
+        O = O.astype(int)
+        M = M.astype(int)
+        # Create new image based on mapping O to M
+        mapped_img = M[original_image]
+        mapped_img = Image.fromarray(mapped_img)
+    else:
+        print("Error: Filepaths are missing.")    
+        
+    return mapped_img    
+
+
+def choose_reference_image():
+    file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp")])
+    reference_entry.delete(0, tk.END)
+    reference_entry.insert(0, file_path)
+    load_and_display_image(file_path, reference_canvas)
+
+def choose_target_image():
+    file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp")])
+    target_entry.delete(0, tk.END)
+    target_entry.insert(0, file_path)
+    load_and_display_image(file_path, target_canvas)
+
+def load_and_display_image(file_path, canvas):
+    try:
+        image = Image.open(file_path)
+        resized_image = image.resize((300, 300))
+        display_image(resized_image, canvas)
+    except Exception as e:
+        tk.messagebox.showerror("Error", f"Failed to load image: {e}")
+
+def display_image(image, canvas):
+    # Resize the image to fit the canvas
+    resized_image = image.resize((300, 300))
+    # Convert the resized image to PhotoImage
+    photo = ImageTk.PhotoImage(resized_image)
+    # Update the canvas with the PhotoImage
+    canvas.create_image(0, 0, anchor=tk.NW, image=photo)
+    # Keep a reference to the PhotoImage to avoid garbage collection
+    canvas.image = photo
+
+def perform_histogram_specification():
+    if reference_entry.get() and target_entry.get():
+        reference_image = Image.open(reference_entry.get())
+        target_image = Image.open(target_entry.get())
+
+        # Perform histogram specification
+        matched_image = set_histogram_specification(reference_image, target_image)
+
+        # Display matched image
+        display_image(matched_image, matched_canvas)
+    else:
+        messagebox.showerror("Error", "Please select both reference and target images.")
+
+# Create the main window
+window = tk.Tk()
+window.geometry("1000x500")
+window.title("Histogram Specification")
+
+# Create and place widgets
+tk.Label(window, text="Target Image:").grid(row=0, column=0, padx=10, pady=10)
+reference_entry = tk.Entry(window, width=50)
+reference_entry.grid(row=1, column=0, padx=10, pady=10)
+tk.Button(window, text="Browse", command=choose_reference_image).grid(row=2, column=0, padx=10, pady=10)
+
+reference_canvas = Canvas(window, width=300, height=300)
+reference_canvas.grid(row=3, column=0, padx=10, pady=10)
+
+tk.Label(window, text="Reference Image:").grid(row=0, column=1, padx=10, pady=10)
+target_entry = tk.Entry(window, width=50)
+target_entry.grid(row=1, column=1, padx=10, pady=10)
+tk.Button(window, text="Browse", command=choose_target_image).grid(row=2, column=1, padx=10, pady=10)
+
+target_canvas = Canvas(window, width=300, height=300)
+target_canvas.grid(row=3, column=1, padx=10, pady=10)
+
+tk.Label(window, text="Resultant Image:").grid(row=0, column=2, padx=10, pady=10)
+
+matched_canvas = Canvas(window, width=300, height=300)
+matched_canvas.grid(row=3, column=2, padx=10, pady=10)
+
+image_item = reference_canvas.create_image(0, 0, anchor=tk.NW)
+
+button_config = {'bg': 'red', 'fg': 'white', 'pady': 0, 'padx': 2}
+
+tk.Button(window, text="Perform Histogram Specification", command=perform_histogram_specification, ** button_config).grid(row=4, column=0, columnspan=2, padx=10, pady=10)
+
+# Start the GUI event loop
+window.mainloop()
