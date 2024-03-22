@@ -1,0 +1,53 @@
+import cv2
+import numpy as np
+from tkinter import filedialog, Canvas, messagebox, simpledialog
+
+
+def ACE_filter(input_image_path, k1_value, k2_value, n_value):
+    # Read input image
+    input_img = cv2.imread(input_image_path, cv2.IMREAD_GRAYSCALE)
+
+    if input_img is None:
+        print("Error: Failed to load input image.")
+        return
+
+    output_img = np.zeros_like(input_img, dtype=np.float64)
+
+    mean_input_img = np.mean(input_img)
+
+    height, width = input_img.shape[:2]
+    for i in range(height - n_value + 1):
+        for j in range(width - n_value + 1):
+            x_start = i
+            x_end = i + n_value
+            y_start = j
+            y_end = j + n_value
+
+            x_middle = i + n_value // 2
+            y_middle = j + n_value // 2
+
+            sub_img = input_img[x_start:x_end, y_start:y_end]   # window size
+            mean_sub_img = np.mean(sub_img)
+            std_dev_sub_img = np.sqrt(np.sum((sub_img - mean_sub_img) ** 2) / max((n_value * 2 - 1), 1))
+
+            if std_dev_sub_img == 0:
+                enhanced_pixel = input_img[x_middle, y_middle]  #if zero then replace middle value
+            else:
+                enhanced_pixel = k1_value * (mean_input_img / std_dev_sub_img) * (input_img[x_middle, y_middle] - mean_sub_img) + k2_value * mean_sub_img
+            output_img[x_middle, y_middle] = np.clip(enhanced_pixel, 0, 255)
+
+    return output_img.astype(np.uint8)
+
+image_str = simpledialog.askstring("Input", "Enter image path:")
+input_image_path = image_str  #./b.png
+input_str = simpledialog.askstring("Input", "Enter k1, k2, window_size (e.g., 0.5,0.5,6):")
+k1_value, k2_value, window_size = map(float, input_str.split(','))
+k1_value = float(k1_value)  # Adjust as needed
+k2_value = float(k2_value)  # Adjust as needed
+window_size = int(window_size)  # Adjust as needed
+
+output_image = ACE_filter(input_image_path, k1_value, k2_value, window_size)
+
+cv2.imshow("Output Image", output_image)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
